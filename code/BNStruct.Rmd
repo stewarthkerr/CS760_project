@@ -1,0 +1,57 @@
+---
+title: "BNStruct"
+author: "Stewart Kerr"
+date: "April 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(bnstruct)
+library(dplyr)
+library(reshape)
+library(tidyr)
+df <- read.delim("../data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv", comment.char="#")
+
+#Get number of timepoints
+timepoints <- df[1] %>% unique()
+n_timepoints <- nrow(timepoints)
+
+#Tranpose the data for BNDataset
+df_unstack <- function(df){
+  #Height of the stacks
+  timepoints <- df[1] %>% unique()
+  n_timepoints <- nrow(timepoints)
+  
+  unstack_df <- df[1:n_timepoints,]
+  
+  return(unstack_df)
+}
+
+unstack_df <- df_unstack(df)
+
+df_transpose <- function(df){
+  t_df <- as.data.frame(t(df[-1]))
+  
+  return(t_df)
+}
+
+t_df <- df_transpose(unstack_df)
+```
+
+
+```{r BNDataset, warning=FALSE,erorr=FALSE,message=FALSE}
+#Creates a BN dataset
+bn_df <- BNDataset(data = t_df,
+                   variables = as.character(as.vector(t(timepoints))),
+                   discreteness = rep('c',n_timepoints),
+                   num.time.steps = n_timepoints,
+                   node.sizes = rep(2,n_timepoints))
+
+#Examine the dataset
+show(bn_df)
+
+#Attempt to learn network
+dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
+show(dbn)
+```
