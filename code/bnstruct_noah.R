@@ -33,16 +33,44 @@ for (t in int_times) {
 
   if (t < max(int_times)) {
     
-    time_pair <- cbind(df %>% filter(int_time == t) %>% select(-c(int_time)), df %>% filter(int_time == t + 1) %>% select(-c(Time,int_time)))
+    time_pair <- cbind(df %>% filter(int_time == t) %>% select(-c(Time, int_time)), df %>% filter(int_time == t + 1) %>% select(-c(Time,int_time)))
   
     final_df <- rbind(final_df, time_pair)
     
   }
 }
 
+#Creates a BN dataset
+bn_df <- BNDataset(data = final_df,
+                   variables = rep(gene_names,n_timepoints),
+                   discreteness = rep(rep('c',n_genes),n_timepoints),
+                   num.time.steps = n_timepoints,
+                   node.sizes = rep(rep(2,n_genes),n_timepoints))
+
+#Examine the dataset
+#show(bn_df)
+
+#Attempt to learn network
+dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
+show(dbn)
 
 ################################################################################################################################################
 ################################################################################################################################################
+
+library(bnstruct)
+library(dplyr)
+library(reshape)
+library(tidyr)
+df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
+
+#Get number of timepoints
+timepoints <- df[1] %>% unique()
+n_timepoints <- nrow(timepoints)
+
+#Get gene names/numbers
+gene_names <- colnames(df)[-1]
+n_genes <- length(gene_names)
+
 #Tranpose the data for BNDataset
 df_unstack <- function(df,start){
   #Height of the stacks
@@ -82,8 +110,6 @@ wide_unstack_df_combine <- function(df){
 }
 
 bn_ready_df = wide_unstack_df_combine(df)
-
-
 
 #Creates a BN dataset
 bn_df <- BNDataset(data = bn_ready_df,
