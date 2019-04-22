@@ -11,11 +11,15 @@ library(bnstruct)
 library(dplyr)
 library(reshape)
 library(tidyr)
+#library(graph)
+#library(Rgraphviz) required to plot DBN
 df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
 
 #Get number of timepoints
 timepoints <- df[1] %>% unique()
-n_timepoints <- nrow(timepoints)
+
+#Temporarily reduce # of timepoints
+n_timepoints <- 2
 
 #Get gene names/numbers
 gene_names <- colnames(df)[-1]
@@ -63,18 +67,37 @@ bn_ready_df = wide_unstack_df_combine(df)
 ```
 
 
-```{r BNDataset, warning=FALSE,erorr=FALSE,message=FALSE}
+```{r Dynamic Bayes Net}
+#Temporary
+var_names <- c('G1T1','G2T1','G3T1','G4T1','G5T1','G6T1','G7T1','G8T1','G9T1','G10T1','G1T2','G2T2','G3T2','G4T2','G5T2','G6T2','G7T2','G8T2','G9T2','G10T2')
+
+
 #Creates a BN dataset
 bn_df <- BNDataset(data = bn_ready_df,
-                   variables = rep(gene_names,n_timepoints),
+                   variables = var_names,#rep(gene_names,n_timepoints),
                    discreteness = rep(rep('c',n_genes),n_timepoints),
                    num.time.steps = n_timepoints,
-                   node.sizes = rep(rep(2,n_genes),n_timepoints))
+                   node.sizes = rep(rep(5,n_genes),n_timepoints))
 
 #Examine the dataset
 #show(bn_df)
 
 #Attempt to learn network
 dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
-show(dbn)
+#show(dbn)
+#cpts(dbn)
+```
+
+```{r Static Bayes Net}
+static_df <- select(df, -Time)
+
+#Create BN dataset
+bn_df <- BNDataset(data = static_df,
+                   variables = gene_names,
+                   discreteness = rep('c',n_genes),
+                   node.sizes = rep(2,n_genes))
+
+#Learn static network
+bn <- learn.network(bn_df, algo = "mmpc", scoring.func = "BDeu")
+plot(bn)
 ```
