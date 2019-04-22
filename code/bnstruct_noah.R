@@ -12,7 +12,7 @@ df <- read.delim("./data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size1
 #df <- read.delim("./data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv", comment.char="#")
 
 #Get number of timepoints
-n_timepoints <- 6
+n_timepoints <- 2
 
 #Get gene names/numbers
 gene_names <- colnames(df)[-1]
@@ -26,7 +26,8 @@ df$int_time <- (df$Time / 50) + 1
 #Get unique values for times (there are 21)
 int_times <- unique(df$int_time)
 
-#For each time point grab data and data from each n_timepoint. cbind rows and then append to a datafarme
+#For each time point grab data and data from each n_timepoint. 
+#Cbind rows and then append to a datafarme with rbind
 final_df = data.frame()
 
 for (t in int_times) {
@@ -68,20 +69,19 @@ show(dbn)
 plot(dbn)
 
 ###Loop for plots
-################################################################################################################################################
-################################################################################################################################################
-
-pdf(paste0("bnstructtimepointsplot.pdf"))
-for(n in 2:15){
-  #Setwd (specific to me)
-  setwd("~/GithubRepositories/CS760_project")
+#####################################################################################################################
+#####################################################################################################################
+pdf(paste0("bnstructnodesizesplot.pdf"))
+node_splits <- c(2, 4, 6, 8)
+for(j in node_splits){
+  print(j)
   
-  #Load in data
-  df <- read.delim("./data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
-  #df <- read.delim("./data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv", comment.char="#")
-print(n)
+#Load in data
+df <- read.delim("./data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
+#df <- read.delim("./data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv", comment.char="#")
+
 #Get number of timepoints
-n_timepoints <- n
+n_timepoints <- 6
 
 #Get gene names/numbers
 gene_names <- colnames(df)[-1]
@@ -128,22 +128,22 @@ bn_df <- BNDataset(data = final_df,
                    variables = colnames(final_df),
                    discreteness = rep(rep('c',n_genes),n_timepoints),
                    num.time.steps = n_timepoints,
-                   node.sizes = rep(rep(2,n_genes),n_timepoints))
+                   node.sizes = rep(rep(j,n_genes),n_timepoints))
 
 
 #Attempt to learn network
 dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
 #show(dbn)
 plot(dbn)
-title(sub = paste0(n, " # of timepoints"))
+title(sub = paste0(j, " :# of bins"))
 
 }
 dev.off()
 dev.off()
 
 ###Stuart's Code
-################################################################################################################################################
-################################################################################################################################################
+####################################################################################################################################
+####################################################################################################################################
 
 library(bnstruct)
 library(dplyr)
