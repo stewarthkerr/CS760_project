@@ -13,7 +13,7 @@ library(reshape)
 library(tidyr)
 #library(graph)
 #library(Rgraphviz) required to plot DBN
-df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
+df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_2/insilico_size10_2_timeseries.tsv", comment.char="#")
 
 #Get number of timepoints
 timepoints <- df[1] %>% unique()
