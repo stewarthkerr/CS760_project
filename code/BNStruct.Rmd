@@ -101,3 +101,30 @@ bn_df <- BNDataset(data = static_df,
 bn <- learn.network(bn_df, algo = "mmpc", scoring.func = "BDeu")
 plot(bn)
 ```
+
+
+```{r Linear Regression}
+library("corrplot")
+library("glmnet")
+library("glasso")
+
+#Read in dataset
+df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_2/insilico_size10_2_timeseries.tsv", comment.char="#")
+dft1 <- df_unstack(df, start = 22)
+
+#Build covariance matrix
+df_cov <- cov(dft1[-1])
+
+#Building network - simple linear regression
+grn <- lm(G1 ~ G10+G2+G3+G4+G5+G6+G7+G8+G9, data = df)
+
+
+#Correlation matrix
+#rquery.cormat(df)
+
+#LASSO
+#glmnet(df[,3:11], df[,2], family = "gaussian", alpha = 1, lambda = NULL)
+
+#GLASSO
+glasso(df_cov, rho = 0.009)
+```
