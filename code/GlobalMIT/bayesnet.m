@@ -25,7 +25,7 @@ true_net = GroundTruthMat("DREAM4_GoldStandard_InSilico_Size10_1.csv", 10, 10);
 s_true=score_MIT(data,true_net);
 
 %% Learn DBN structure
-alpha=0.997;
+alpha=0.999;
 allowSelfLoop=1;
 [best_net]=globalMIT_ab(a, b, alpha, allowSelfLoop);
 csvwrite("structure.csv", best_net)
