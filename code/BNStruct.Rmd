@@ -13,16 +13,35 @@ library(reshape)
 library(tidyr)
 #library(graph)
 #library(Rgraphviz) required to plot DBN
-df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_2/insilico_size10_2_timeseries.tsv", comment.char="#")
+
+#Read in the RData for Arab
+load("../output/Clustering.RDATA.RData")
+df_clustered = cbind(net$colors, data_no0) %>%
+  filter(`net$colors` > 0) %>%
+  group_by(`net$colors`)
+
+#Average across clusters
+df_clust_avg = summarise_all(df_clustered, mean)
+
+#1 row per cluster per replication
+tempdf1 = select(df_clust_avg, cluster = `net$colors`, contains("_1")) %>%
+  mutate(rep = 1) %>%
+  rename_at(.vars = vars(ends_with("_1")),
+            .funs = funs(sub("_1", "", .)))
+tempdf2 = select(df_clust_avg, cluster = `net$colors`, contains("_2")) %>%
+  mutate(rep = 2) %>%
+  rename_at(.vars = vars(ends_with("_2")),
+            .funs = funs(sub("_2", "", .)))
+arab_clust_avg = rbind(tempdf1,tempdf2)
+
+#DREAM dataset
+dream <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
 
 #Get number of timepoints
-timepoints <- df[1] %>% unique()
-
-#Temporarily reduce # of timepoints
-n_timepoints <- 2
+timepoints <- dream[1] %>% unique()
 
 #Get gene names/numbers
-gene_names <- colnames(df)[-1]
+gene_names <- colnames(dream)[-1]
 n_genes <- length(gene_names)
 
 #Tranpose the data for BNDataset
@@ -38,6 +57,9 @@ df_unstack <- function(df,start){
 }
 
 df_widen <- function(unstack_df){
+  timepoints <- df[1] %>% unique()
+  n_timepoints <- nrow(timepoints)
+  
   #Transposes the dataset to get it in the right form for BN
   wide_unstack_df <- data.frame()
   for (tp in 1:n_timepoints){
@@ -63,29 +85,39 @@ wide_unstack_df_combine <- function(df){
   return(final_df)
 }
 
-bn_ready_df = wide_unstack_df_combine(df)
+#bn_ready_df = wide_unstack_df_combine(dream)
+bn_ready_dream = df_unstack(dream,1)
+bn_ready_arab <- df_unstack(arab_clust_avg,1) %>%
+  t() 
+
+var_names <- as.character(bn_ready_arab[1,])
+n_genes <- length(var_names)
+
+bn_ready_arab = bn_ready_arab[2:11,]
+
 ```
 
 
 ```{r Dynamic Bayes Net}
 #Temporary
-var_names <- c('G1T1','G2T1','G3T1','G4T1','G5T1','G6T1','G7T1','G8T1','G9T1','G10T1','G1T2','G2T2','G3T2','G4T2','G5T2','G6T2','G7T2','G8T2','G9T2','G10T2')
-
+#var_names <- c('G1','G2','G3','G4','G5','G6','G7','G8','G9','G10')
 
 #Creates a BN dataset
-bn_df <- BNDataset(data = bn_ready_df,
-                   variables = var_names,#rep(gene_names,n_timepoints),
-                   discreteness = rep(rep('c',n_genes),n_timepoints),
-                   num.time.steps = n_timepoints,
-                   node.sizes = rep(rep(5,n_genes),n_timepoints))
+bn_df <- BNDataset(data = bn_ready_arab,
+                   variables = var_names,
+                   discreteness = rep('c',n_genes),
+                   num.time.steps = 1,
+                   node.sizes = rep(2,n_genes))
 
 #Examine the dataset
 #show(bn_df)
 
 #Attempt to learn network
-dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
+dbn <- learn.network(bn_df)
 #show(dbn)
 #cpts(dbn)
+x = dag(dbn)
+plot(dbn)
 ```
 
 ```{r Static Bayes Net}
@@ -107,13 +139,19 @@ plot(bn)
 library("corrplot")
 library("glmnet")
 library("glasso")
+library("stringr")
 
-#Read in dataset
-df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_2/insilico_size10_2_timeseries.tsv", comment.char="#")
+
+
+
+#Read in DREAM dataset
+df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
 dft1 <- df_unstack(df, start = 22)
 
-#Build covariance matrix
+#Build covariance matrices
+arab_cov <- cov(arab_clust_avg[,2:11])
 df_cov <- cov(dft1[-1])
+
 
 #Building network - simple linear regression
 grn <- lm(G1 ~ G10+G2+G3+G4+G5+G6+G7+G8+G9, data = df)
@@ -126,5 +164,39 @@ grn <- lm(G1 ~ G10+G2+G3+G4+G5+G6+G7+G8+G9, data = df)
 #glmnet(df[,3:11], df[,2], family = "gaussian", alpha = 1, lambda = NULL)
 
 #GLASSO
-glasso(df_cov, rho = 0.009)
+glasso(df_cov, rho = 0.006)
+#glasso(arab_cov, rho=0.05)
+```
+
+
+```{r GeneNet}
+# load GeneNet library
+library("GeneNet")
+# generate random network with 20 nodes and 10 percent edges (=19 edges)
+true.pcor <- ggm.simulate.pcor(20, 0.1)
+# convert to edge list
+test.results <- ggm.list.edges(true.pcor)[1:19,]
+######## use graphviz directly to produce a plot ##########
+# uncomment for actual use!
+#nlab <- LETTERS[1:20]
+#ggm.make.dot(filename="test.dot", test.results, nlab, main = "A graph")
+#system("fdp -T svg -o test.svg test.dot") # SVG format
+######## use Rgraphviz produce a plot ##########
+# uncomment for actual use!
+nlab <- LETTERS[1:20]
+gr <- network.make.graph( test.results, nlab)
+gr
+num.nodes(gr)
+edge.info(gr)
+gr2 <- network.make.graph( test.results, nlab, drop.singles=TRUE)
+gr2
+num.nodes(gr2)
+edge.info(gr2)
+# plot network
+# NOTE: this requires the installation of the "Rgraphviz" library
+library("Rgraphviz")
+plot(gr, "fdp")
+plot(gr2, "fdp")
+## for a full example with beautified Rgraphviz plot see
+## the example scripts provide with GeneNet (e.g. arabidopis-net.R)
 ```
