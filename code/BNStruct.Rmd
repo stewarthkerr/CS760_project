@@ -14,36 +14,6 @@ library(tidyr)
 #library(graph)
 #library(Rgraphviz) required to plot DBN
 
-#Read in the RData for Arab
-load("../output/Clustering.RDATA.RData")
-df_clustered = cbind(net$colors, data_no0) %>%
-  filter(`net$colors` > 0) %>%
-  group_by(`net$colors`)
-
-#Average across clusters
-df_clust_avg = summarise_all(df_clustered, mean)
-
-#1 row per cluster per replication
-tempdf1 = select(df_clust_avg, cluster = `net$colors`, contains("_1")) %>%
-  mutate(rep = 1) %>%
-  rename_at(.vars = vars(ends_with("_1")),
-            .funs = funs(sub("_1", "", .)))
-tempdf2 = select(df_clust_avg, cluster = `net$colors`, contains("_2")) %>%
-  mutate(rep = 2) %>%
-  rename_at(.vars = vars(ends_with("_2")),
-            .funs = funs(sub("_2", "", .)))
-arab_clust_avg = rbind(tempdf1,tempdf2)
-
-#DREAM dataset
-dream <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
-
-#Get number of timepoints
-timepoints <- dream[1] %>% unique()
-
-#Get gene names/numbers
-gene_names <- colnames(dream)[-1]
-n_genes <- length(gene_names)
-
 #Tranpose the data for BNDataset
 df_unstack <- function(df,start){
   #Height of the stacks
@@ -85,43 +55,109 @@ wide_unstack_df_combine <- function(df){
   return(final_df)
 }
 
-#bn_ready_df = wide_unstack_df_combine(dream)
-bn_ready_dream = df_unstack(dream,1)
-bn_ready_arab <- df_unstack(arab_clust_avg,1) %>%
-  t() 
+```
 
-var_names <- as.character(bn_ready_arab[1,])
-n_genes <- length(var_names)
+```{r Arabidopsis}
+#Read in the RData for Arab
+load("../output/Clustering.RDATA.RData")
+df_clustered = cbind(net$colors, data_no0) %>%
+  filter(`net$colors` > 0) %>%
+  group_by(`net$colors`)
 
-bn_ready_arab = bn_ready_arab[2:11,]
+#Average across clusters
+df_clust_avg = summarise_all(df_clustered, mean)
 
+#1 row per cluster per replication
+tempdf1 = select(df_clust_avg, cluster = `net$colors`, contains("_1")) %>%
+  rename_at(.vars = vars(ends_with("_1")),
+            .funs = funs(sub("_1", "", .)))
+tempdf2 = select(df_clust_avg, cluster = `net$colors`, contains("_2")) %>%
+  rename_at(.vars = vars(ends_with("_2")),
+            .funs = funs(sub("_2", "", .)))
+#Grab clusters
+clusters <- as.character(pull(tempdf1, cluster))
+clusters <- paste("C",clusters,sep="")
+#Grab timepoints
+n_timepoints <- ncol(tempdf1)-1
+#Tranpose data
+tempdf1 <- t(tempdf1)[2:11,]
+colnames(tempdf1) <- clusters
+tempdf1 <- as.data.frame(tempdf1) %>%
+  rename(clusters) %>%
+  mutate(rep = 1, timepoint = rownames(tempdf1))
+tempdf2 <- t(tempdf2)[2:11,]
+colnames(tempdf2) <- clusters
+tempdf2 <- as.data.frame(tempdf2) %>%
+  rename(clusters) %>%
+  mutate(rep = 2, timepoint = rownames(tempdf2))
+
+arab_clust_avg = rbind(tempdf1,tempdf2) 
+
+arab_clust_avg_reshaped = data.frame()
+col.from = colnames(arab_clust_avg)
+col.to1 = paste(colnames(arab_clust_avg),"T1",sep="_") #Needed for timepoint names
+col.to2 = paste(colnames(arab_clust_avg),"T2",sep="_") #Needed for timepoint names
+for (i in seq(from = 1, to = n_timepoints-1)){
+  
+  d1 = filter(arab_clust_avg, timepoint == paste("M",i,sep="")) %>%
+    rename_at(vars(col.from), ~col.to1)
+  d2 = filter(arab_clust_avg, timepoint == paste("M",i+1,sep="")) %>%
+    rename_at(vars(col.from), ~col.to2)
+  d1_1 = filter(d1, rep_T1 == 1)
+  d1_2 = filter(d1, rep_T1 == 2)
+  d2_1 = filter(d2, rep_T2 == 1)
+  d2_2 = filter(d2, rep_T2 == 2)
+  all_comb = rbind(cbind(d1_1,d2_1),
+                   cbind(d1_1,d2_2),
+                   cbind(d1_2,d2_1),
+                   cbind(d1_2,d2_2))
+  arab_clust_avg_reshaped = rbind(arab_clust_avg_reshaped,all_comb)
+}
+
+arab_clust_avg_reshaped2 = unite_(arab_clust_avg_reshaped,"dp", c("rep_T1", "timepoint_T1","rep_T2","timepoint_T2"), sep = "_")
+
+```
+
+```{r}
+#DREAM dataset
+dream <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
+
+#Get number of timepoints
+timepoints <- dream[1] %>% unique()
+
+#Get gene names/numbers
+gene_names <- colnames(dream)[-1]
+n_genes <- length(gene_names)
+
+
+bn_ready_df = wide_unstack_df_combine(dream)
 ```
 
 
 ```{r Dynamic Bayes Net}
 #Temporary
-#var_names <- c('G1','G2','G3','G4','G5','G6','G7','G8','G9','G10')
+var_names <- colnames(select(arab_clust_avg_reshaped2, -dp))
 
 #Creates a BN dataset
-bn_df <- BNDataset(data = bn_ready_arab,
+bn_df <- BNDataset(data = select(arab_clust_avg_reshaped2, -dp),
                    variables = var_names,
-                   discreteness = rep('c',n_genes),
-                   num.time.steps = 1,
-                   node.sizes = rep(2,n_genes))
+                   discreteness = rep('c',length(clusters)),
+                   num.time.steps = 2,
+                   node.sizes = rep(3,length(clusters)))
 
 #Examine the dataset
 #show(bn_df)
 
 #Attempt to learn network
-dbn <- learn.network(bn_df)
+dbn <- learn.dynamic.network(bn_df, num.time.steps = 2)
 #show(dbn)
 #cpts(dbn)
 x = dag(dbn)
-plot(dbn)
+#plot(dbn)
 ```
 
 ```{r Static Bayes Net}
-static_df <- select(df, -Time)
+static_df <- select(dream, -Time)
 
 #Create BN dataset
 bn_df <- BNDataset(data = static_df,
@@ -130,7 +166,7 @@ bn_df <- BNDataset(data = static_df,
                    node.sizes = rep(2,n_genes))
 
 #Learn static network
-bn <- learn.network(bn_df, algo = "mmpc", scoring.func = "BDeu")
+bn <- learn.network(bn_df, scoring.func = "BDeu")
 plot(bn)
 ```
 
@@ -161,7 +197,7 @@ grn <- lm(G1 ~ G10+G2+G3+G4+G5+G6+G7+G8+G9, data = df)
 #rquery.cormat(df)
 
 #LASSO
-#glmnet(df[,3:11], df[,2], family = "gaussian", alpha = 1, lambda = NULL)
+glmnet(dream[,3:11], dream[,2], family = "gaussian", alpha = 1, lambda = NULL)
 
 #GLASSO
 glasso(df_cov, rho = 0.006)
