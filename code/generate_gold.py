@@ -14,7 +14,7 @@ def parse_args():
     parser = argparse.ArgumentParser(prog=sys.argv[0], description="Utility to generate the gold standard graph of gene interactions by pulling interactions from BioGRID repo.")
     parser.add_argument('-i', '--input', action='store', required=True, help="An input file with list of genes in experiment that have gene expression data, in a tab-delimited format.")
     parser.add_argument('-c', '--gene_column', action='store', default="Gene ID", help="Name of column header containing gene ids for lookup in BioGRID repo.")
-    parser.add_argument('--delimiter', action='store', default=',', help="Default delimiter separating fields from input file.")
+    parser.add_argument('--delimiter', action='store', default="\t", help="Default delimiter separating fields from input file.")
     parser.add_argument('-a', '--access_key', action='store', default="ce5f7787eb9eed0fe6f1461c4d568162", help="BioGRID access key for using their REST API service.")
     parser.add_argument('-t', '--tax_id', action='store', type=int, default=3702, help="BioGRID taxonomy id of species to search genes in.")
     parser.add_argument('-o', '--output', action='store', required=True, help="An output file as adjacency list format with lists of genes and their associated parents.")
@@ -67,5 +67,6 @@ if __name__ == '__main__':
                 if( parsed.pickle):
                     nx.write_gpickle(G, parsed.pickle)
             count = count + 1
+        nx.write_gpickle(G, parsed.pickle)
         df = nx.to_pandas_adjacency(G, nodelist=geneids)
         df.to_csv(parsed.output, header=df.columns)
