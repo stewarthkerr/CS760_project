@@ -3,12 +3,15 @@ library(bnstruct)
 library(dplyr)
 library(reshape)
 library(tidyr)
+library(bnlearn)
 
 #Setwd (specific to me)
 setwd("~/GithubRepositories/CS760_project")
 
 #Load in data
 df <- read.delim("./data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
+gold <- read.delim("./data/DREAM4_Challenge2_GoldStandards/Size 10/DREAM4_GoldStandard_InSilico_Size10_1.tsv", comment.char = "#",
+                   stringsAsFactors = FALSE)
 #df <- read.delim("./data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv", comment.char="#")
 
 #Get number of timepoints
@@ -17,7 +20,6 @@ n_timepoints <- 2
 #Get gene names/numbers
 gene_names <- colnames(df)[-1]
 n_genes <- length(gene_names)
-
 
 #Format data as 2 timepoint data
 
@@ -64,7 +66,8 @@ bn_df <- BNDataset(data = final_df,
 
 
 #Attempt to learn network
-dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
+dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints,
+                             scoring.func = 'BDeu')
 show(dbn)
 plot(dbn)
 
@@ -212,3 +215,4 @@ bn_df <- BNDataset(data = bn_ready_df,
 #Attempt to learn network
 dbn <- learn.dynamic.network(bn_df, num.time.steps = n_timepoints)
 show(dbn)
+
