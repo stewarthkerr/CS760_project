@@ -18,3 +18,9 @@ golden2cluster_at:
 
 golden2cluster_atd:
 		python3 -m pdb ./golden2cluster.py -i ../data/Arab.Meristem/arabidopsis.meristem.expression.csv -c "Feature_ID" --delimiter=',' --cluster ../output/Clustering.csv -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.csv --pickle ../data/Arab.Meristem/arabidopsis.meristem.biogrid.graph.pickle --opickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle
+
+goldenThreshold_at:
+		./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold 0.01
+
+goldenThreshold_atd:
+		python3 -m pdb ./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold 0.01
