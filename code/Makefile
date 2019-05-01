@@ -32,3 +32,6 @@ analysis_at:
 
 cluster2expression_at:
 	 R CMD BATCH '--args num_reps=20' cluster2expression.R
+
+clean:
+	rm *.Rout
