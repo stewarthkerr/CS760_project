@@ -58,5 +58,3 @@ if __name__ == '__main__':
                 mG.add_edge(i, j, weight=cut_size)
 
     nx.write_gpickle(mG, parsed.opickle)
-    df = nx.to_pandas_adjacency(mG)
-    df.to_csv(parsed.output, header=df.columns)
