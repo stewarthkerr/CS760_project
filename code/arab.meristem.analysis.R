@@ -1,18 +1,19 @@
----
-title: "BNStruct"
-author: "Stewart Kerr"
-date: "April 20, 2019"
-output: html_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+### Load package, data, and define functions
+#####################################################################################################################
+#####################################################################################################################
 library(bnstruct)
 library(dplyr)
 library(reshape)
 library(tidyr)
 #library(graph)
 #library(Rgraphviz) required to plot DBN
+
+#Read in the RData for Arab
+load("../output/Clustering.RDATA.RData")
+#Read in gold standard
+gold <- read.delim("../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv", header=FALSE) %>%
+  filter(V1 != 0, V2 != 0) %>%
+  mutate(V1 = paste("C",V1,sep=""), V2 = paste("C",V2,sep=""))
 
 #Tranpose the data for BNDataset
 df_unstack <- function(df,start){
@@ -55,11 +56,10 @@ wide_unstack_df_combine <- function(df){
   return(final_df)
 }
 
-```
 
-```{r Arabidopsis}
-#Read in the RData for Arab
-load("../output/Clustering.RDATA.RData")
+###Data input and formatting
+#####################################################################################################################
+#####################################################################################################################
 df_clustered = cbind(net$colors, data_no0) %>%
   filter(`net$colors` > 0) %>%
   group_by(`net$colors`)
@@ -114,38 +114,23 @@ for (i in seq(from = 1, to = n_timepoints-1)){
   arab_clust_avg_reshaped = rbind(arab_clust_avg_reshaped,all_comb)
 }
 
-arab_clust_avg_reshaped2 = unite_(arab_clust_avg_reshaped,"dp", c("rep_T1", "timepoint_T1","rep_T2","timepoint_T2"), sep = "_")
-
-```
-
-```{r}
-#DREAM dataset
-dream <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
-
-#Get number of timepoints
-timepoints <- dream[1] %>% unique()
-
-#Get gene names/numbers
-gene_names <- colnames(dream)[-1]
-n_genes <- length(gene_names)
+arab_clust_avg_reshaped = unite_(arab_clust_avg_reshaped,"dp", c("rep_T1", "timepoint_T1","rep_T2","timepoint_T2"), sep = "_")
 
 
-bn_ready_df = wide_unstack_df_combine(dream)
-```
-
-
-```{r Dynamic Bayes Net}
+###Learn the DBN
+#####################################################################################################################
+#####################################################################################################################
 #Temporary
-var_names <- colnames(select(arab_clust_avg_reshaped2, -dp))
+var_names <- colnames(select(arab_clust_avg_reshaped, -dp))
 n_clusters = length(clusters)
 n_timepoints = 2
 
 #Creates a BN dataset
-bn_df <- BNDataset(data = select(arab_clust_avg_reshaped2, -dp),
+bn_df <- BNDataset(data = select(arab_clust_avg_reshaped, -dp),
                    variables = var_names,
-                   discreteness = rep('c',length(clusters)),
-                   num.time.steps = 2,
-                   node.sizes = rep(3,length(clusters)))
+                   discreteness = rep('c',n_clusters),
+                   num.time.steps = n_timepoints,
+                   node.sizes = rep(3,n_clusters))
 
 #Examine the dataset
 #show(bn_df)
@@ -156,14 +141,11 @@ dbn <- learn.dynamic.network(bn_df, num.time.steps = 2)
 #cpts(dbn)
 #x = dag(dbn)
 #plot(dbn)
-```
 
-```{r}
-#Assessing BN
-gold <- read.delim("../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv", header=FALSE) %>%
-  filter(V1 != 0, V2 != 0) %>%
-  mutate(V1 = paste("C",V1,sep=""), V2 = paste("C",V2,sep=""))
 
+###Assessing BN
+#####################################################################################################################
+#####################################################################################################################
 ###Collapse Network
 #####################################################################################################################
 #####################################################################################################################
@@ -236,87 +218,3 @@ recall <- tp / (tp + fn)
 
 #Get Accuracy
 accuracy <- (n_edges - fn - fp) / n_edges
-
-print(precision, recall, accuracy)
-```
-
-```{r Static Bayes Net}
-static_df <- select(dream, -Time)
-
-#Create BN dataset
-bn_df <- BNDataset(data = static_df,
-                   variables = gene_names,
-                   discreteness = rep('c',n_genes),
-                   node.sizes = rep(2,n_genes))
-
-#Learn static network
-bn <- learn.network(bn_df, scoring.func = "BDeu")
-plot(bn)
-```
-
-
-```{r Linear Regression}
-library("corrplot")
-library("glmnet")
-library("glasso")
-library("stringr")
-
-
-
-
-#Read in DREAM dataset
-df <- read.delim("../data/DREAM4_InSilico_Size10/insilico_size10_1/insilico_size10_1_timeseries.tsv", comment.char="#")
-dft1 <- df_unstack(df, start = 22)
-
-#Build covariance matrices
-arab_cov <- cov(arab_clust_avg[,2:11])
-df_cov <- cov(dft1[-1])
-
-
-#Building network - simple linear regression
-grn <- lm(G1 ~ G10+G2+G3+G4+G5+G6+G7+G8+G9, data = df)
-
-
-#Correlation matrix
-#rquery.cormat(df)
-
-#LASSO
-glmnet(dream[,3:11], dream[,2], family = "gaussian", alpha = 1, lambda = NULL)
-
-#GLASSO
-glasso(df_cov, rho = 0.006)
-#glasso(arab_cov, rho=0.05)
-```
-
-
-```{r GeneNet}
-# load GeneNet library
-library("GeneNet")
-# generate random network with 20 nodes and 10 percent edges (=19 edges)
-true.pcor <- ggm.simulate.pcor(20, 0.1)
-# convert to edge list
-test.results <- ggm.list.edges(true.pcor)[1:19,]
-######## use graphviz directly to produce a plot ##########
-# uncomment for actual use!
-#nlab <- LETTERS[1:20]
-#ggm.make.dot(filename="test.dot", test.results, nlab, main = "A graph")
-#system("fdp -T svg -o test.svg test.dot") # SVG format
-######## use Rgraphviz produce a plot ##########
-# uncomment for actual use!
-nlab <- LETTERS[1:20]
-gr <- network.make.graph( test.results, nlab)
-gr
-num.nodes(gr)
-edge.info(gr)
-gr2 <- network.make.graph( test.results, nlab, drop.singles=TRUE)
-gr2
-num.nodes(gr2)
-edge.info(gr2)
-# plot network
-# NOTE: this requires the installation of the "Rgraphviz" library
-library("Rgraphviz")
-plot(gr, "fdp")
-plot(gr2, "fdp")
-## for a full example with beautified Rgraphviz plot see
-## the example scripts provide with GeneNet (e.g. arabidopis-net.R)
-```
