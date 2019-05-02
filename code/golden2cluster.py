@@ -54,7 +54,7 @@ if __name__ == '__main__':
         for j in range(i+1, num_modules):
             cut_size = nx.algorithms.cuts.cut_size(G,G.graph['modules'][i],G.graph['modules'][j])
             if cut_size > 0:
-                cut_size = cut_size / (G.graph['size'][i] + G.graph['size'][j])
+                cut_size = cut_size / ((G.graph['size'][i] + G.graph['size'][j])/2)
                 mG.add_edge(i, j, weight=cut_size)
 
     nx.write_gpickle(mG, parsed.opickle)

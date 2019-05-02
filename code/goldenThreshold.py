@@ -30,6 +30,6 @@ if __name__ == '__main__':
     for index,val in np.ndenumerate(df):
         rvalue = index[0]
         cvalue = index[1]
-        out_fh.write("%d\t%d\t%d\n" % (rvalue,cvalue,val))
+        out_fh.write("ME%d\tME%d\t%d\n" % (rvalue,cvalue,val))
     out_fh.close()
 
