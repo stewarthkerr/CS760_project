@@ -8,17 +8,23 @@ library(igraph)
 
 #Setwd (specific to me)
 setwd("~/GithubRepositories/CS760_project")
-
 #Load in data
 d_path <- "./data/DREAM4_InSilico_Size100/insilico_size100_1/insilico_size100_1_timeseries.tsv"
 g_path <- "./data/DREAM4_Challenge2_GoldStandards/Size 100/DREAM4_GoldStandard_InSilico_Size100_1.tsv"
+d <- read.delim(d_path, comment.char = "#")
+g <- read.delim(g_path, header = FALSE, stringsAsFactors = FALSE)
 
-bnstruct_analysis <- function(data_path, gold_standard_path, n_timepoints, 
-                              node_size = 3, scoring_function = "BDeu", fitting_algorithm = "mmhc",
+#### connect to server
+
+#library(remoter)
+#remoter::client(addr = "DESKTOP-M7AFUVD", port = 55655, password = "noahtaft")
+#c2s(d)
+#c2s(g)
+
+bnstruct_analysis <- function(df, gold, n_timepoints, 
+                              node_size = 2, scoring_function = "BDeu", fitting_algorithm = "mmhc",
                               verbose = FALSE) {
   
-df <- read.delim(data_path, comment.char = "#")
-gold <- read.delim(gold_standard_path, header = FALSE, stringsAsFactors = FALSE)
 
 #Get gene names/numbers
 gene_names <- colnames(df)[-1]
@@ -113,8 +119,8 @@ for(diag in 1:nrow(collapsed_edges)){
   collapsed_edges[diag,diag] = FALSE
 }
 
-if (verbose == TRUE) {
 cond_plot <- graph_from_adjacency_matrix(collapsed_edges,mode = "directed")
+if (verbose == TRUE) {
 plot(cond_plot)
 }
 
@@ -149,13 +155,36 @@ recall <- tp / (tp + fn)
 #Get Accuracy
 accuracy <- (n_edges - fn - fp) / n_edges
 
-return(c(precision, recall, accuracy))
+output <- list()
+
+output[[1]] = c(precision, recall, accuracy)
+output[[2]] = dbn
+output[[3]] = collapsed_edges
+output[[4]] = cond_plot
+
+return(output)
 
 }
 
 #############################################################################
+bnstruct_analysis(d, g, n_timepoints = 2, node_size = 2, verbose = FALSE)
 
 acc_list = list()
-for (k in 2:10){
-  acc_list[[(k-1)]] = bnstruct_analysis(d_path, g_path, n_timepoints = k, verbose = TRUE)
-}
+dbn_list = list()
+collapse_list = list()
+cond_list = list()
+
+k = 1
+for (n_time in 2:4){
+  for (n_size in 2:3){
+    print(paste(k, n_time, n_size, sep = " "))
+    out = bnstruct_analysis(d, g, n_timepoints = n_time, node_size = n_size,
+                                        verbose = FALSE)
+    acc_list[[k]] = out[[1]]
+    dbn_list[[k]] = out[[2]]
+    collapse_list[[k]] = out[[3]]
+    cond_list[[k]] = out[[4]]
+    k = k + 1
+  }}
+
+#s2c(acc_list)
