@@ -1,3 +1,9 @@
+TIMEPOINTS ?= 2
+REPS ?= 2
+THRESHOLD ?= 0.02
+EXPRESSION ?= average
+
+
 gold_at:
 		./generate_gold.py -i ../data/Arab.Meristem/arabidopsis.meristem.expression.csv -c "Feature_ID" --delimiter=',' -o ../data/Arab.Meristem/arabidopsis.meristem.biogrid.interactions.csv --pickle ../data/Arab.Meristem/arabidopsis.meristem.biogrid.graph.pickle
 
@@ -20,7 +26,19 @@ golden2cluster_atd:
 		python3 -m pdb ./golden2cluster.py -i ../data/Arab.Meristem/arabidopsis.meristem.expression.csv -c "Feature_ID" --delimiter=',' --cluster ../output/Clustering.csv -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.csv --pickle ../data/Arab.Meristem/arabidopsis.meristem.biogrid.graph.pickle --opickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle
 
 goldenThreshold_at:
-		./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold 0.01
+		./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.t$(THRESHOLD).tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold $(THRESHOLD)
 
 goldenThreshold_atd:
-		python3 -m pdb ./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold 0.01
+		python3 -m pdb ./goldenThreshold.py -o ../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.t$(THRESHOLD).tsv --pickle ../data/Arab.Meristem/arabidopsis.meristem.modules.graph.pickle --threshold $(THRESHOLD)
+
+analysis_at:
+	 R CMD BATCH '--args expression="$(EXPRESSION)" n_dbn_timepoints=$(TIMEPOINTS) n_reps=$(REPS) g_file="../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.t$(THRESHOLD).tsv" d_path="../output/Clustering.RDATA.RData"' arab.meristem.analysis.R
+
+cluster2expression_at:
+	 R CMD BATCH '--args num_reps=20' cluster2expression.R
+
+perf_at:
+		R CMD BATCH '--args save_file="../output/arab.meristem.analysis.$(EXPRESSION).$(TIMEPOINTS).RData"' arab.meristem.perf.R
+
+clean:
+	rm *.Rout
