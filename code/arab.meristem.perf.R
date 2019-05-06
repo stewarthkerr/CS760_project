@@ -1,6 +1,6 @@
 library(dplyr)
 
-save_file = "arab.meristem.analysis.me.2.RData"
+save_file = "../output/arab.meristem.analysis.me.2.RData"
 args = commandArgs(trailingOnly=TRUE)
 if(length(args)!=0) {
     for(i in 1:length(args)) {
@@ -8,6 +8,13 @@ if(length(args)!=0) {
     }
 }
 load(save_file)
+#Yes, this looks silly, but reparse command-line args
+args = commandArgs(trailingOnly=TRUE)
+if(length(args)!=0) {
+    for(i in 1:length(args)) {
+        eval(parse(text=args[[i]]))
+    }
+}
 
 #Read in gold standard
 gold <- read.delim(g_file, header=FALSE) %>%
