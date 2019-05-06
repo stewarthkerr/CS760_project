@@ -3,17 +3,31 @@
 #####################################################################################################################
 library(bnstruct)
 library(dplyr)
-library(reshape)
+library(gtools)
 library(tidyr)
 #library(graph)
 #library(Rgraphviz) required to plot DBN
 
+expression = "average"
+n_dbn_timepoints = 2
+n_reps = 2
+d_file="../output/Clustering.RDATA.RData"
+g_file="../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.t0.02.tsv"
+
+args = commandArgs(trailingOnly=TRUE)
+if(length(args)!=0) {
+    for(i in 1:length(args)) {
+        eval(parse(text=args[[i]]))
+    }
+}
+
+save_file = sprintf("../output/arab.meristem.analysis.%s.%d.RData", expression, n_dbn_timepoints)
 #Read in the RData for Arab
-load("../output/Clustering.RDATA.RData")
+load(d_file)
 #Read in gold standard
-gold <- read.delim("../data/Arab.Meristem/arabidopsis.meristem.modules.interactions.tsv", header=FALSE) %>%
+gold <- read.delim(g_file, header=FALSE) %>%
   filter(V1 != 0, V2 != 0) %>%
-  mutate(V1 = paste("C",V1,sep=""), V2 = paste("C",V2,sep=""))
+  mutate(V1 = sub("ME","C",V1), V2 = sub("ME","C",V2))
 
 #Tranpose the data for BNDataset
 df_unstack <- function(df,start){
@@ -60,61 +74,97 @@ wide_unstack_df_combine <- function(df){
 ###Data input and formatting
 #####################################################################################################################
 #####################################################################################################################
-df_clustered = cbind(net$colors, data_no0) %>%
-  filter(`net$colors` > 0) %>%
-  group_by(`net$colors`)
+if( expression == "average" ) {
+    df_clustered = cbind(net$colors, data_no0) %>%
+    filter(`net$colors` > 0) %>%
+    group_by(`net$colors`)
 
-#Average across clusters
-df_clust_avg = summarise_all(df_clustered, mean)
+    #Average across clusters
+    df_clust_avg = summarise_all(df_clustered, mean)
 
-#1 row per cluster per replication
-tempdf1 = select(df_clust_avg, cluster = `net$colors`, contains("_1")) %>%
-  rename_at(.vars = vars(ends_with("_1")),
-            .funs = funs(sub("_1", "", .)))
-tempdf2 = select(df_clust_avg, cluster = `net$colors`, contains("_2")) %>%
-  rename_at(.vars = vars(ends_with("_2")),
-            .funs = funs(sub("_2", "", .)))
-#Grab clusters
-clusters <- as.character(pull(tempdf1, cluster))
-clusters <- paste("C",clusters,sep="")
-#Grab timepoints
-n_timepoints <- ncol(tempdf1)-1
-#Tranpose data
-tempdf1 <- t(tempdf1)[2:11,]
-colnames(tempdf1) <- clusters
-tempdf1 <- as.data.frame(tempdf1) %>%
-  rename(clusters) %>%
-  mutate(rep = 1, timepoint = rownames(tempdf1))
-tempdf2 <- t(tempdf2)[2:11,]
-colnames(tempdf2) <- clusters
-tempdf2 <- as.data.frame(tempdf2) %>%
-  rename(clusters) %>%
-  mutate(rep = 2, timepoint = rownames(tempdf2))
+    #1 row per cluster per replication
+    tempdf1 = select(df_clust_avg, cluster = `net$colors`, contains("_1")) %>%
+    rename_at(.vars = vars(ends_with("_1")),
+                .funs = funs(sub("_1", "", .)))
+    tempdf2 = select(df_clust_avg, cluster = `net$colors`, contains("_2")) %>%
+    rename_at(.vars = vars(ends_with("_2")),
+                .funs = funs(sub("_2", "", .)))
+    #Grab clusters
+    clusters <- as.character(pull(tempdf1, cluster))
+    clusters <- paste("C",clusters,sep="")
+    #Grab timepoints
+    n_timepoints <- ncol(tempdf1)-1
+    #Tranpose data
+    tempdf1 <- t(tempdf1)[2:11,]
+    colnames(tempdf1) <- clusters
+    tempdf1 <- as.data.frame(tempdf1) %>%
+    mutate(rep = 1, timepoint = rownames(tempdf1))
+    tempdf2 <- t(tempdf2)[2:11,]
+    colnames(tempdf2) <- clusters
+    tempdf2 <- as.data.frame(tempdf2) %>%
+    mutate(rep = 2, timepoint = rownames(tempdf2))
 
-arab_clust_avg = rbind(tempdf1,tempdf2) 
+    arab_clust_avg = rbind(tempdf1,tempdf2) 
+    n_clusters = length(clusters)
+} else { 
+    #1 row per cluster per replication
+    mes <- data.frame(t(net$MEs))
+    mes <- mes[2:nrow(mes),]
+    clusters = rownames(mes)
+    n_clusters = nrow(mes)
+    rownames(mes) = sub('ME','',rownames(mes))
+    mes <- mes[order(as.numeric(rownames(mes))),]
+    rownames(mes) = sprintf('C%s', rownames(mes))
+    tempdf1 = select(mes, contains("_1")) %>%
+        rename_at(.vars = vars(ends_with("_1")),
+                  .funs = funs(sub("_1", "", .)))
+    tempdf2 = select(mes, contains("_2")) %>%
+        rename_at(.vars = vars(ends_with("_2")),
+                  .funs = funs(sub("_2", "", .)))
+    #Grab timepoints
+    n_timepoints <- ncol(tempdf1)
+    tempdf1 <- as.data.frame(t(tempdf1))
+    tempdf1 <- mutate(tempdf1, rep = 1, timepoint = rownames(tempdf1))
+    tempdf2 <- as.data.frame(t(tempdf2))
+    tempdf2 <- mutate(tempdf2, rep = 2, timepoint = rownames(tempdf2))
+
+    arab_clust_avg = rbind(tempdf1,tempdf2) 
+}
 
 arab_clust_avg_reshaped = data.frame()
 col.from = colnames(arab_clust_avg)
-col.to1 = paste(colnames(arab_clust_avg),"T1",sep="_") #Needed for timepoint names
-col.to2 = paste(colnames(arab_clust_avg),"T2",sep="_") #Needed for timepoint names
-for (i in seq(from = 1, to = n_timepoints-1)){
-  
-  d1 = filter(arab_clust_avg, timepoint == paste("M",i,sep="")) %>%
-    rename_at(vars(col.from), ~col.to1)
-  d2 = filter(arab_clust_avg, timepoint == paste("M",i+1,sep="")) %>%
-    rename_at(vars(col.from), ~col.to2)
-  d1_1 = filter(d1, rep_T1 == 1)
-  d1_2 = filter(d1, rep_T1 == 2)
-  d2_1 = filter(d2, rep_T2 == 1)
-  d2_2 = filter(d2, rep_T2 == 2)
-  all_comb = rbind(cbind(d1_1,d2_1),
-                   cbind(d1_1,d2_2),
-                   cbind(d1_2,d2_1),
-                   cbind(d1_2,d2_2))
+for (i in 1:n_dbn_timepoints) {
+    eval(parse(text=sprintf("col.to%d = paste(colnames(arab_clust_avg),\"T%d\",sep=\"_\")", i, i)))
+}
+#Generate rep suffixes for permutations
+suffixes = c()
+for( k in 1:n_reps ) {
+    suffixes = cbind(suffixes, sprintf("%d", k))
+}
+perms = permutations(n=n_reps,r=n_dbn_timepoints,v=suffixes,repeats.allowed=TRUE)
+for( k in 1:n_dbn_timepoints ) {
+    perms[,k] = sprintf("d%d_%s", k, perms[,k])
+}
+perms <- as.data.frame(perms)
+mutate_str <- sprintf("all_comb_str <- perms %%>%% mutate(bind_str=sprintf(\"cbind(%s)\",%s))", paste0(rep("%s",n_dbn_timepoints), collapse=','), paste0(colnames(perms), collapse=','))
+eval(parse(text=(mutate_str)))
+rbind_str <- sprintf("rbind(%s)",paste0(all_comb_str$bind_str,collapse=','))
+    
+
+for (i in seq(from = 1, to = n_timepoints-(n_dbn_timepoints-1))){
+  for (j in 1:n_dbn_timepoints) {
+      eval(parse(text=sprintf("d%d = filter(as.data.frame(arab_clust_avg), timepoint == paste(\"M\",i+%d,sep=\"\")) %%>%% rename_at(vars(col.from), ~col.to%d)", j,j-1,j)))
+      for( k in 1:n_reps ) {
+        eval(parse(text=sprintf("d%d_%d = filter(d%d, rep_T%d == %d)", j, k, j, j, k)))
+      }
+  }
+  eval(parse(text=sprintf("all_comb <- %s", rbind_str)))
+  #all_comb = c()
   arab_clust_avg_reshaped = rbind(arab_clust_avg_reshaped,all_comb)
 }
 
-arab_clust_avg_reshaped = unite_(arab_clust_avg_reshaped,"dp", c("rep_T1", "timepoint_T1","rep_T2","timepoint_T2"), sep = "_")
+rep_str = paste0(sprintf("\"rep_T%d\",\"timepoint_T%d\"", 1:n_dbn_timepoints, 1:n_dbn_timepoints),collapse=',')
+eval(parse(text=sprintf("arab_clust_avg_reshaped = unite_(arab_clust_avg_reshaped,\"dp\", c(%s), sep = \"_\")", rep_str)))
 
 
 ###Learn the DBN
@@ -122,21 +172,21 @@ arab_clust_avg_reshaped = unite_(arab_clust_avg_reshaped,"dp", c("rep_T1", "time
 #####################################################################################################################
 #Temporary
 var_names <- colnames(select(arab_clust_avg_reshaped, -dp))
-n_clusters = length(clusters)
-n_timepoints = 2
 
 #Creates a BN dataset
 bn_df <- BNDataset(data = select(arab_clust_avg_reshaped, -dp),
                    variables = var_names,
                    discreteness = rep('c',n_clusters),
-                   num.time.steps = n_timepoints,
+                   num.time.steps = n_dbn_timepoints,
                    node.sizes = rep(3,n_clusters))
 
 #Examine the dataset
 #show(bn_df)
 
 #Attempt to learn network
-dbn <- learn.dynamic.network(bn_df, num.time.steps = 2)
+save.image(file=save_file)
+dbn <- learn.dynamic.network(bn_df, num.time.steps = n_dbn_timepoints)
+save.image(file=save_file)
 #show(dbn)
 #cpts(dbn)
 #x = dag(dbn)
@@ -155,9 +205,9 @@ add_elementwise <- function(x) Reduce("+", x)
 #Collapse matrix across timepoints
 collapse <- list();
 k=1
-for(i in seq(1,n_clusters*n_timepoints,n_clusters))
+for(i in seq(1,n_clusters*n_dbn_timepoints,n_clusters))
 {
-  for(j in seq(1,n_clusters*n_timepoints,n_clusters))
+  for(j in seq(1,n_clusters*n_dbn_timepoints,n_clusters))
   {
     collapse[[k]] <- edges[i:(i+n_clusters-1),j:(j+n_clusters-1)]
     k = k+1
@@ -218,3 +268,4 @@ recall <- tp / (tp + fn)
 
 #Get Accuracy
 accuracy <- (n_edges - fn - fp) / n_edges
+save.image(file=save_file)
